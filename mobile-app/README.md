@@ -25,6 +25,25 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+### Voice for blind users (no need to touch buttons)
+
+- **In Expo Go:** The app uses a **tap-anywhere then speak** flow so blind users don’t need to find buttons. After the welcome message you’ll hear: *“Tap anywhere on the screen to speak your command.”* **Tap anywhere once** → a voice screen opens → **tap “Tap to speak”** → then say e.g. *“Start navigation”*, *“Scan surroundings”*, *“Emergency help”*, or *“Open devices”*. The app runs the command and speaks the result.
+- **In a development build:** Continuous voice listening works. You’ll see “Voice listening” and can say commands without tapping.
+
+Install the WebView dependency (used for voice in Expo Go):
+
+```bash
+npx expo install react-native-webview
+```
+
+For **continuous** voice (no tap), use a development build:
+
+```bash
+npx expo run:android
+# or
+npx expo run:ios
+```
+
 ## Get a fresh project
 
 When you're ready, run:

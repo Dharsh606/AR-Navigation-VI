@@ -1,141 +1,282 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
+  TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import * as Speech from "expo-speech";
+import { voiceEngine } from "../services/voiceEngine";
+import { voiceListener } from "../services/voiceListener";
+import VoiceInputModal from "../components/VoiceInputModal";
 
-export default function HomeScreen({ onOpenCamera }) {
+// Speech recognition is loaded only when available (dev build). Expo Go has no native module.
+function getSpeechRecognition() {
+  try {
+    return require("expo-speech-recognition");
+  } catch {
+    return null;
+  }
+}
+
+// Advanced high-contrast theme
+const BG = "#050508";
+const PRIMARY = "#22d3ee";
+const ON_BG = "#0c1222";
+const TEXT = "#e2e8f0";
+const BORDER = "#1e293b";
+
+export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
-  const [locationReady, setLocationReady] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const navigationRef = useRef(navigation);
 
-  useEffect(() => {
-    checkLocation();
+  navigationRef.current = navigation;
+
+  const requestPermissions = useCallback(async () => {
+    const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+    if (locStatus !== "granted") {
+      voiceEngine.speak("Location permission denied. Navigation may be limited.");
+    } else {
+      await Location.getCurrentPositionAsync({});
+    }
+    setLoading(false);
   }, []);
 
-  const checkLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+  useEffect(() => {
+    requestPermissions();
+    voiceEngine.welcome();
+    return () => {
+      voiceEngine.stop();
+    };
+  }, [requestPermissions]);
 
-      if (status !== "granted") {
-        setErrorMsg("Location permission denied.");
-        setLoading(false);
-        return;
-      }
-
-      // Speak after permission is granted
-      Speech.speak("App started. Checking your location.", { rate: 0.95 });
-
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      console.log(
-        "Coords:",
-        location.coords.latitude,
-        location.coords.longitude
-      );
-
-      setLocationReady(true);
-      setLoading(false);
-
-      // Small delay before speaking again
-      setTimeout(() => {
-        Speech.speak("Location detected successfully.", { rate: 0.95 });
-      }, 800);
-    } catch (err) {
-      setErrorMsg("Unable to fetch location.");
-      setLoading(false);
+  const onPress = (action) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    switch (action) {
+      case "navigation":
+        voiceEngine.confirmAction("Starting navigation.");
+        navigation.navigate("AR");
+        break;
+      case "scan":
+        voiceEngine.confirmAction("Opening scan mode.");
+        navigation.navigate("Camera");
+        break;
+      case "emergency":
+        voiceEngine.confirmEmergency();
+        require("../services/emergencyModule").triggerEmergency();
+        break;
+      case "dashboard":
+        voiceEngine.confirmAction("Opening Bluetooth dashboard.");
+        navigation.navigate("Dashboard");
+        break;
+      default:
+        break;
     }
   };
 
-  const speakTestAlert = () => {
-    Speech.speak("Obstacle ahead. Please move slowly.", { rate: 0.95 });
+  const openVoiceFallback = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    voiceEngine.speak("Opening voice fallback. Listening.");
+    setShowVoiceModal(true);
+  };
+
+  const handleVoiceResult = (transcript) => {
+    voiceListener.handleTranscript(transcript, navigationRef.current);
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>AR Navigation</Text>
-      <Text style={styles.sub}>
-        Day-2 build: GPS and Voice features enabled.
+      <VoiceInputModal
+        visible={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onResult={handleVoiceResult}
+      />
+      <View style={styles.headerStrip} />
+      <Text style={styles.title} accessibilityRole="header">
+        AR-NAV-VI
+      </Text>
+      <Text style={styles.subtitle}>
+        Voice-first navigation for the visually impaired
       </Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Location Status</Text>
+      {loading && (
+        <ActivityIndicator size="large" color={PRIMARY} style={styles.loader} />
+      )}
 
-        {loading ? (
-          <View style={styles.row}>
-            <ActivityIndicator />
-            <Text style={styles.smallText}> Detecting your location...</Text>
-          </View>
-        ) : errorMsg ? (
-          <Text style={styles.errorText}>{errorMsg}</Text>
-        ) : locationReady ? (
-          <>
-            <Text style={styles.smallText}>
-              Location detected successfully ✅
-            </Text>
-            <Text style={styles.smallText}>
-              You can start camera navigation.
-            </Text>
-          </>
-        ) : null}
+      <View style={styles.buttons}>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonNav]}
+          onPress={() => onPress("navigation")}
+          accessibilityLabel="Start navigation"
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonText}>Navigation</Text>
+          <Text style={styles.buttonHint}>Start navigation</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.buttonScan]}
+          onPress={() => onPress("scan")}
+          accessibilityLabel="Scan surroundings"
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonText}>AR Scan</Text>
+          <Text style={styles.buttonHint}>Scan surroundings</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.buttonEmergency]}
+          onPress={() => onPress("emergency")}
+          accessibilityLabel="Emergency help"
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonText}>Emergency</Text>
+          <Text style={styles.buttonHint}>Emergency help</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.buttonDashboard]}
+          onPress={() => onPress("dashboard")}
+          accessibilityLabel="Bluetooth dashboard, devices"
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonText}>Devices</Text>
+          <Text style={styles.buttonHint}>Bluetooth dashboard</Text>
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.btn} onPress={onOpenCamera}>
-        <Text style={styles.btnText}>Open Camera</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.btnOutline} onPress={speakTestAlert}>
-        <Text style={styles.btnOutlineText}>Test Voice Alert</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.note}>
-        Next step: Connect AI obstacle detection with camera.
-      </Text>
+      {voiceListener.isListening() ? (
+        <Text style={styles.voiceStatus}>Voice listening</Text>
+      ) : (
+        <>
+          <TouchableOpacity
+            style={[styles.button, styles.fallbackButton]}
+            onPress={openVoiceFallback}
+            accessibilityLabel="Open fallback voice input"
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>Fallback voice</Text>
+            <Text style={styles.buttonHint}>Open voice input</Text>
+          </TouchableOpacity>
+          <Text style={styles.voiceStatusHint}>Voice listening unavailable. Use fallback voice or the buttons.</Text>
+        </>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: "center" },
-  title: { fontSize: 28, fontWeight: "700", marginBottom: 8 },
-  sub: { fontSize: 14, opacity: 0.8, marginBottom: 16 },
-
-  card: {
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    marginBottom: 18,
+  container: {
+    flex: 1,
+    backgroundColor: BG,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === "ios" ? 48 : 24,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
-  row: { flexDirection: "row", alignItems: "center" },
-  smallText: { fontSize: 13, opacity: 0.85 },
-  errorText: { fontSize: 13, color: "crimson" },
-
-  btn: {
-    padding: 14,
-    borderRadius: 10,
-    backgroundColor: "black",
-    alignItems: "center",
-    marginBottom: 10,
+  headerStrip: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: PRIMARY,
+    opacity: 0.6,
   },
-  btnText: { color: "white", fontSize: 16, fontWeight: "600" },
-
-  btnOutline: {
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "black",
-    alignItems: "center",
+  title: {
+    color: PRIMARY,
+    fontSize: 30,
+    fontWeight: "800",
+    textAlign: "center",
+    marginBottom: 6,
+    letterSpacing: 2,
   },
-  btnOutlineText: { color: "black", fontSize: 16, fontWeight: "600" },
-
-  note: { marginTop: 14, fontSize: 12, opacity: 0.65 },
+  subtitle: {
+    color: TEXT,
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 28,
+    opacity: 0.85,
+  },
+  loader: {
+    marginVertical: 16,
+  },
+  buttons: {
+    gap: 14,
+  },
+  button: {
+    backgroundColor: ON_BG,
+    borderWidth: 2,
+    borderColor: BORDER,
+    borderRadius: 18,
+    paddingVertical: 22,
+    paddingHorizontal: 22,
+    minHeight: 84,
+    justifyContent: "center",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 6 },
+      android: { elevation: 4 },
+    }),
+  },
+  buttonNav: {
+    borderColor: PRIMARY,
+  },
+  buttonScan: {
+    borderColor: "#a78bfa",
+  },
+  buttonEmergency: {
+    borderColor: "#f87171",
+  },
+  buttonDashboard: {
+    borderColor: "#34d399",
+  },
+  fallbackButton: {
+    borderColor: PRIMARY,
+    marginTop: 16,
+  },
+  buttonText: {
+    color: TEXT,
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+  buttonHint: {
+    color: TEXT,
+    fontSize: 14,
+    opacity: 0.8,
+    marginTop: 4,
+  },
+  voiceStatus: {
+    position: "absolute",
+    bottom: 28,
+    alignSelf: "center",
+    color: PRIMARY,
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 1,
+    opacity: 0.9,
+  },
+  voiceStatusHint: {
+    position: "absolute",
+    bottom: 28,
+    alignSelf: "center",
+    color: PRIMARY,
+    fontSize: 11,
+    textAlign: "center",
+    paddingHorizontal: 12,
+    opacity: 0.9,
+  },
+  tapToSpeakArea: {
+    paddingVertical: 20,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  tapHint: {
+    color: PRIMARY,
+    fontSize: 13,
+    marginTop: 12,
+    textAlign: "center",
+    opacity: 0.9,
+  },
 });
