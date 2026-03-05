@@ -136,10 +136,20 @@ export default function HomeScreen({ navigation }) {
   }, [requestPermissions]);
 
   useEffect(() => {
-    // Cleanup on unmount
+    try {
+      emergencyService.initialize();
+      console.log('Emergency service initialized');
+    } catch (error) {
+      console.log('Emergency service initialization error:', error);
+    }
+    
     return () => {
-      if (emergencyInterval.current) clearInterval(emergencyInterval.current);
-      emergencyService.cleanup();
+      try {
+        emergencyService.cleanup();
+        console.log('Emergency service cleaned up');
+      } catch (error) {
+        console.log('Emergency service cleanup error:', error);
+      }
     };
   }, []);
 
