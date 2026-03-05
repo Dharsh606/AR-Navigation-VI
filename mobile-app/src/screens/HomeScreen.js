@@ -5,13 +5,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
+  Animated,
+  Dimensions,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { voiceEngine } from "../services/voiceEngine";
-import voiceListener from "../services/voiceListener";
-import VoiceInputModal from "../components/VoiceInputModal";
+import emergencyService from "../services/emergencyService";
 
 // Speech recognition is loaded only when available (dev build). Expo Go has no native module.
 function getSpeechRecognition() {
@@ -19,150 +18,271 @@ function getSpeechRecognition() {
     return require("expo-speech-recognition");
   } catch {
     return null;
-  }a
-// Advanced high-contrast theme
-const BG = "#050508";
-const PRIMARY = "#22d3ee";
-const ON_BG = "#0c1222";
-const TEXT = "#e2e8f0";
-const BORDER = "#1e293b";
+  }
+}
+
+// Modern aesthetic color palette
+const COLORS = {
+  background: "#0F0F1E", // Deep midnight blue
+  primary: "#6366F1", // Indigo
+  secondary: "#8B5CF6", // Purple
+  accent: "#EC4899", // Pink
+  success: "#10B981", // Emerald
+  warning: "#F59E0B", // Amber
+  danger: "#EF4444", // Red
+  surface: "#1A1B3A", // Dark surface
+  card: "#252641", // Card background
+  text: "#F8FAFC", // Light text
+  textSecondary: "#94A3B8", // Secondary text
+  gradient: ["#6366F1", "#8B5CF6", "#EC4899"], // Gradient colors
+};
+
+const { width, height } = Dimensions.get("window");
 
 export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
-  const navigationRef = useRef(navigation);
-
-  navigationRef.current = navigation;
+  const [emergencyActive, setEmergencyActive] = useState(false);
+  const [emergencyCountdown, setEmergencyCountdown] = useState(30);
+  
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const emergencyInterval = useRef(null);
 
   const requestPermissions = useCallback(async () => {
-    const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
-    if (locStatus !== "granted") {
-      voiceEngine.speak("Location permission denied. Navigation may be limited.");
-    } else {
-      await Location.getCurrentPositionAsync({});
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log("Location permission:", status);
+    } catch (error) {
+      console.log("Permission error:", error);
     }
     setLoading(false);
+    
+    // Start animations when loading is complete
+    startAnimations();
+  }, []);
+
+  const startAnimations = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const startEmergency = useCallback(() => {
+    try {
+      setEmergencyActive(true);
+      setEmergencyCountdown(30);
+      
+      // Start countdown
+      emergencyInterval.current = setInterval(() => {
+        setEmergencyCountdown(prev => {
+          if (prev <= 1) {
+            stopEmergency();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      // Start emergency service (vibration + siren)
+      emergencyService.startEmergency();
+      // TODO: Pass siren audio file when you provide it
+      // emergencyService.startEmergency(sirenAudioFile);
+      
+      console.log("🚨 EMERGENCY ACTIVATED - 30 second countdown started");
+      
+    } catch (error) {
+      console.log("Emergency start error:", error);
+    }
+  }, []);
+
+  const stopEmergency = useCallback(() => {
+    try {
+      setEmergencyActive(false);
+      setEmergencyCountdown(30);
+      
+      if (emergencyInterval.current) {
+        clearInterval(emergencyInterval.current);
+        emergencyInterval.current = null;
+      }
+      
+      // Stop emergency service
+      emergencyService.stopEmergency();
+      
+      console.log("🛑 Emergency stopped");
+      
+    } catch (error) {
+      console.log("Emergency stop error:", error);
+    }
   }, []);
 
   useEffect(() => {
     requestPermissions();
-    voiceEngine.welcome();
-    return () => {
-      voiceEngine.stop();
-    };
   }, [requestPermissions]);
 
+  useEffect(() => {
+    // Cleanup on unmount
+    return () => {
+      if (emergencyInterval.current) clearInterval(emergencyInterval.current);
+      emergencyService.cleanup();
+    };
+  }, []);
+
   const onPress = (action) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    switch (action) {
-      case "navigation":
-        voiceEngine.confirmAction("Starting navigation.");
-        navigation.navigate("AR");
-        break;
-      case "scan":
-        voiceEngine.confirmAction("Opening scan mode.");
-        navigation.navigate("Camera");
-        break;
-      case "emergency":
-        voiceEngine.confirmEmergency();
-        require("../services/emergencyModule").triggerEmergency();
-        break;
-      case "dashboard":
-        voiceEngine.confirmAction("Opening Bluetooth dashboard.");
-        navigation.navigate("Dashboard");
-        break;
-      default:
-        break;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      switch (action) {
+        case "navigation":
+          navigation.navigate("AR");
+          break;
+        case "scan":
+          navigation.navigate("Camera");
+          break;
+        case "dashboard":
+          navigation.navigate("Dashboard");
+          break;
+        case "emergency":
+          if (emergencyActive) {
+            stopEmergency();
+          } else {
+            startEmergency();
+          }
+          break;
+      }
+    } catch (error) {
+      console.log("Button error:", error);
     }
   };
 
-  const openVoiceFallback = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    voiceEngine.speak("Opening voice fallback. Listening.");
-    setShowVoiceModal(true);
-  };
-
-  const handleVoiceResult = (transcript) => {
-    voiceListener.handleTranscript(transcript, navigationRef.current);
-  };
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Animated.Text 
+            style={[styles.loadingText, { opacity: fadeAnim }]}
+          >
+            Initializing AR Navigation...
+          </Animated.Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <VoiceInputModal
-        visible={showVoiceModal}
-        onClose={() => setShowVoiceModal(false)}
-        onResult={handleVoiceResult}
-      />
-      <View style={styles.headerStrip} />
-      <Text style={styles.title} accessibilityRole="header">
-        AR-NAV-VI
-      </Text>
-      <Text style={styles.subtitle}>
-        Voice-first navigation for the visually impaired
-      </Text>
+      {/* Background gradient effect */}
+      <View style={styles.backgroundGradient} />
+      
+      {/* Header */}
+      <Animated.View 
+        style={[
+          styles.header,
+          { 
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
+        <Text style={styles.title}>AR-NAV-VI</Text>
+        <Text style={styles.subtitle}>Voice-First Navigation Assistant</Text>
+        <View style={styles.underline} />
+      </Animated.View>
 
-      {loading && (
-        <ActivityIndicator size="large" color={PRIMARY} style={styles.loader} />
-      )}
-
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonNav]}
+      {/* Button Grid */}
+      <Animated.View 
+        style={[
+          styles.buttonGrid,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <TouchableOpacity 
+          style={[styles.button, styles.navigationButton]} 
           onPress={() => onPress("navigation")}
-          accessibilityLabel="Start navigation"
-          accessibilityRole="button"
+          activeOpacity={0.7}
         >
-          <Text style={styles.buttonText}>Navigation</Text>
-          <Text style={styles.buttonHint}>Start navigation</Text>
+          <View style={styles.buttonIcon}>
+            <Text style={styles.iconText}>🧭</Text>
+          </View>
+          <View style={styles.buttonContent}>
+            <Text style={styles.buttonTitle}>Navigation</Text>
+            <Text style={styles.buttonSubtitle}>Start your journey</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.buttonScan]}
+        <TouchableOpacity 
+          style={[styles.button, styles.scanButton]} 
           onPress={() => onPress("scan")}
-          accessibilityLabel="Scan surroundings"
-          accessibilityRole="button"
+          activeOpacity={0.7}
         >
-          <Text style={styles.buttonText}>AR Scan</Text>
-          <Text style={styles.buttonHint}>Scan surroundings</Text>
+          <View style={styles.buttonIcon}>
+            <Text style={styles.iconText}>📷</Text>
+          </View>
+          <View style={styles.buttonContent}>
+            <Text style={styles.buttonTitle}>Scan</Text>
+            <Text style={styles.buttonSubtitle}>Explore surroundings</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.buttonEmergency]}
-          onPress={() => onPress("emergency")}
-          accessibilityLabel="Emergency help"
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>Emergency</Text>
-          <Text style={styles.buttonHint}>Emergency help</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.buttonDashboard]}
+        <TouchableOpacity 
+          style={[styles.button, styles.dashboardButton]} 
           onPress={() => onPress("dashboard")}
-          accessibilityLabel="Bluetooth dashboard, devices"
-          accessibilityRole="button"
+          activeOpacity={0.7}
         >
-          <Text style={styles.buttonText}>Devices</Text>
-          <Text style={styles.buttonHint}>Bluetooth dashboard</Text>
+          <View style={styles.buttonIcon}>
+            <Text style={styles.iconText}>🏠</Text>
+          </View>
+          <View style={styles.buttonContent}>
+            <Text style={styles.buttonTitle}>Smart Home</Text>
+            <Text style={styles.buttonSubtitle}>Control your devices</Text>
+          </View>
         </TouchableOpacity>
-      </View>
 
-      {voiceListener.isListening() ? (
-        <Text style={styles.voiceStatus}>Voice listening</Text>
-      ) : (
-        <>
-          <TouchableOpacity
-            style={[styles.button, styles.fallbackButton]}
-            onPress={openVoiceFallback}
-            accessibilityLabel="Open fallback voice input"
-            accessibilityRole="button"
-          >
-            <Text style={styles.buttonText}>Fallback voice</Text>
-            <Text style={styles.buttonHint}>Open voice input</Text>
-          </TouchableOpacity>
-          <Text style={styles.voiceStatusHint}>Voice listening unavailable. Use fallback voice or the buttons.</Text>
-        </>
-      )}
+        <TouchableOpacity 
+          style={[styles.button, styles.emergencyButton, emergencyActive && styles.emergencyButtonActive]} 
+          onPress={() => onPress("emergency")}
+          activeOpacity={0.7}
+        >
+          <View style={styles.buttonIcon}>
+            <Text style={styles.iconText}>{emergencyActive ? "🛑" : "🚨"}</Text>
+          </View>
+          <View style={styles.buttonContent}>
+            <Text style={[styles.buttonTitle, styles.emergencyText]}>
+              {emergencyActive ? "STOP EMERGENCY" : "Emergency"}
+            </Text>
+            <Text style={[styles.buttonSubtitle, styles.emergencySubtitle]}>
+              {emergencyActive ? `${emergencyCountdown}s remaining` : "Get help now"}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Footer */}
+      <Animated.View 
+        style={[
+          styles.footer,
+          { opacity: fadeAnim }
+        ]}
+      >
+        <Text style={styles.footerText}>🎤 Voice commands available</Text>
+        <Text style={styles.footerSubtext}>Tap buttons or speak naturally</Text>
+      </Animated.View>
     </View>
   );
 }
@@ -170,111 +290,152 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG,
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === "ios" ? 48 : 24,
+    backgroundColor: COLORS.background,
   },
-  headerStrip: {
-    position: "absolute",
+  backgroundGradient: {
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 3,
-    backgroundColor: PRIMARY,
-    opacity: 0.6,
+    height: height * 0.6,
+    backgroundColor: COLORS.primary,
+    opacity: 0.1,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: COLORS.text,
+    marginTop: 20,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: height * 0.15,
+    paddingHorizontal: 20,
+    marginBottom: 40,
   },
   title: {
-    color: PRIMARY,
-    fontSize: 30,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 6,
+    fontSize: 42,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 8,
     letterSpacing: 2,
+    textShadowColor: COLORS.primary,
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
   subtitle: {
-    color: TEXT,
-    fontSize: 15,
-    textAlign: "center",
-    marginBottom: 28,
-    opacity: 0.85,
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 16,
+    fontWeight: '400',
   },
-  loader: {
-    marginVertical: 16,
+  underline: {
+    width: 60,
+    height: 4,
+    backgroundColor: COLORS.primary,
+    borderRadius: 2,
+    marginTop: 8,
   },
-  buttons: {
-    gap: 14,
+  buttonGrid: {
+    paddingHorizontal: 20,
+    gap: 16,
+    flex: 1,
   },
   button: {
-    backgroundColor: ON_BG,
-    borderWidth: 2,
-    borderColor: BORDER,
-    borderRadius: 18,
-    paddingVertical: 22,
-    paddingHorizontal: 22,
-    minHeight: 84,
-    justifyContent: "center",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 6 },
-      android: { elevation: 4 },
-    }),
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    minHeight: 80,
   },
-  buttonNav: {
-    borderColor: PRIMARY,
+  buttonContent: {
+    flex: 1,
+    marginLeft: 16,
   },
-  buttonScan: {
-    borderColor: "#a78bfa",
+  navigationButton: {
+    borderLeftColor: COLORS.primary,
+    borderLeftWidth: 4,
   },
-  buttonEmergency: {
-    borderColor: "#f87171",
+  scanButton: {
+    borderLeftColor: COLORS.secondary,
+    borderLeftWidth: 4,
   },
-  buttonDashboard: {
-    borderColor: "#34d399",
+  dashboardButton: {
+    borderLeftColor: COLORS.success,
+    borderLeftWidth: 4,
   },
-  fallbackButton: {
-    borderColor: PRIMARY,
-    marginTop: 16,
+  emergencyButton: {
+    borderLeftColor: COLORS.danger,
+    borderLeftWidth: 4,
+    backgroundColor: '#1A0F0F',
   },
-  buttonText: {
-    color: TEXT,
-    fontSize: 22,
-    fontWeight: "bold",
+  emergencyButtonActive: {
+    backgroundColor: COLORS.danger,
+    borderLeftColor: '#FFFFFF',
+    shadowColor: COLORS.danger,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 12,
   },
-  buttonHint: {
-    color: TEXT,
+  buttonIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconText: {
+    fontSize: 24,
+  },
+  buttonTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  buttonSubtitle: {
     fontSize: 14,
-    opacity: 0.8,
-    marginTop: 4,
+    color: COLORS.textSecondary,
+    fontWeight: '400',
   },
-  voiceStatus: {
-    position: "absolute",
-    bottom: 28,
-    alignSelf: "center",
-    color: PRIMARY,
-    fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 1,
-    opacity: 0.9,
+  emergencyText: {
+    color: COLORS.danger,
   },
-  voiceStatusHint: {
-    position: "absolute",
-    bottom: 28,
-    alignSelf: "center",
-    color: PRIMARY,
-    fontSize: 11,
-    textAlign: "center",
-    paddingHorizontal: 12,
-    opacity: 0.9,
+  emergencySubtitle: {
+    color: '#FCA5A5',
   },
-  tapToSpeakArea: {
-    paddingVertical: 20,
-    paddingHorizontal: 8,
-    marginBottom: 8,
+  footer: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    alignItems: 'center',
+    gap: 8,
   },
-  tapHint: {
-    color: PRIMARY,
-    fontSize: 13,
-    marginTop: 12,
-    textAlign: "center",
-    opacity: 0.9,
+  footerText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  footerSubtext: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    opacity: 0.7,
   },
 });
