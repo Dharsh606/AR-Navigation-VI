@@ -136,14 +136,14 @@ const discoveredDevices = [
 
 ## 📱 APK Download & Installation
 
-### 🚀 **Latest Release - Version 2.0**
-**Download Link**: [📥 Download AR Navigation VI v2.0 APK](https://github.com/Dharsh606/AR-Navigation-VI/releases/latest)
+### 🚀 **Latest Release - Version 2.1 (FIXED)**
+**Download Link**: [📥 Download AR Navigation VI v2.1 APK (Crash Fixed)](https://github.com/Dharsh606/AR-Navigation-VI/releases/latest)
 
 ### Alternative Download Options:
 
 #### Option 1: GitHub Releases (Recommended)
 1. Visit: https://github.com/Dharsh606/AR-Navigation-VI/releases
-2. Click on the latest release (v2.0)
+2. Click on the latest release (v2.1 - Fixed)
 3. Download `app-release.apk`
 4. Install on your Android device
 
