@@ -1,0 +1,87 @@
+name: Release APK
+on:
+  push:
+    branches:
+      - main
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+        
+      - name: Cache Gradle
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+            
+      - name: Install dependencies
+        run: |
+          cd mobile-app
+          npm install --legacy-peer-deps
+          
+      - name: Build APK
+        run: |
+          cd android
+          ./gradlew assembleRelease
+          
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: AR-Navigation-VI-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/release/app-release.apk
+          name: AR Navigation VI v2.0
+          tag: v2.0
+          body: |
+            ## 🚀 AR Navigation VI v2.0 - Enhanced Accessibility App
+            
+            ### ✨ New Features:
+            - 🎯 AI-powered obstacle detection with voice alerts
+            - 🗺️ Advanced turn-by-turn navigation with landmarks  
+            - 🏠 Complete smart home integration
+            - 🚨 Enhanced emergency system (medical, police, fire, lost)
+            - ♿ Full accessibility enhancements
+            
+            ### 📱 Download:
+            - **APK**: `app-release.apk` below
+            - **Source**: Full source code available
+            - **Docs**: Comprehensive README included
+            
+            ### 🔧 Installation:
+            1. Download the APK file below
+            2. Enable "Install from unknown sources" on Android
+            3. Install and grant permissions
+            4. Enjoy enhanced accessibility features!
+            
+            ### 🌟 Impact:
+            - Company-level accessibility features
+            - Real-world utility for blind users  
+            - Life-changing navigation assistance
+            - Independent living support
+            
+            ---
+            Made with ❤️ for the blind and visually impaired community

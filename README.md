@@ -134,20 +134,68 @@ const discoveredDevices = [
 ];
 ```
 
-## 📱 APK Installation
+## 📱 APK Download & Installation
 
-### For Android Devices
-1. Download the latest APK from `android/app/build/outputs/apk/release/app-release.apk`
-2. Enable "Install from unknown sources" in device settings
-3. Install the APK
-4. Grant required permissions (camera, location, microphone, SMS)
+### 🚀 **Latest Release - Version 2.0**
+**Download Link**: [📥 Download AR Navigation VI v2.0 APK](https://github.com/Dharsh606/AR-Navigation-VI/releases/latest)
 
-### Permissions Required
-- **Camera** - For obstacle detection
-- **Location** - For navigation and emergency services
-- **Microphone** - For voice commands
-- **SMS** - For emergency notifications
-- **Bluetooth** - For smart home control
+### Alternative Download Options:
+
+#### Option 1: GitHub Releases (Recommended)
+1. Visit: https://github.com/Dharsh606/AR-Navigation-VI/releases
+2. Click on the latest release (v2.0)
+3. Download `app-release.apk`
+4. Install on your Android device
+
+#### Option 2: Direct Build from Source
+```bash
+git clone https://github.com/Dharsh606/AR-Navigation-VI.git
+cd AR-Nav-VI
+npm install --legacy-peer-deps
+cd android
+./gradlew assembleRelease
+# APK will be in: android/app/build/outputs/apk/release/app-release.apk
+```
+
+#### Option 3: Development Build
+```bash
+git clone https://github.com/Dharsh606/AR-Navigation-VI.git
+cd AR-Nav-VI/mobile-app
+npm install --legacy-peer-deps
+npx expo start
+# Scan QR code with Expo Go app
+```
+
+### 🔧 **Installation Instructions**
+
+#### For Android Devices:
+1. **Download APK** from the link above
+2. **Enable Unknown Sources**:
+   - Go to Settings > Security > Install unknown apps
+   - Toggle "Allow from this source"
+3. **Install APK**:
+   - Open the downloaded file
+   - Follow installation prompts
+4. **Grant Permissions**:
+   - Camera (for obstacle detection)
+   - Location (for navigation)
+   - Microphone (for voice commands)
+   - SMS (for emergency alerts)
+   - Bluetooth (for smart home control)
+5. **Launch App** and complete setup wizard
+
+#### Quick Setup:
+- Open app → Grant permissions → Set emergency contacts → Test voice commands
+- Say "Hello" to test voice recognition
+- Say "Scan surroundings" to test obstacle detection
+- Say "Emergency" to test SOS system
+
+### 📋 **System Requirements**
+- **Android**: 7.0+ (API level 24+)
+- **Storage**: 100MB free space
+- **RAM**: 2GB+ recommended
+- **Permissions**: Camera, Location, Microphone, SMS, Bluetooth
+- **Network**: WiFi or Mobile data for emergency features
 
 ## 🎯 Usage Guide
 
