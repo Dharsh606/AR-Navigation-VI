@@ -6,11 +6,7 @@
 import { Audio } from "expo-av";
 import * as Speech from "expo-speech";
 
-const TTS_OPTIONS = {
-  rate: 0.88,
-  pitch: 1,
-  language: "en-US",
-};
+let CURRENT_OPTIONS = { rate: 0.88, pitch: 1, language: "en-US" };
 
 let isSpeaking = false;
 let lastSpoken = null;
@@ -35,7 +31,7 @@ export const voiceEngine = {
     if (isSpeaking) Speech.stop();
     isSpeaking = true;
     lastSpoken = text;
-    Speech.speak(text, { ...TTS_OPTIONS, ...options, onDone: () => { isSpeaking = false; } });
+    Speech.speak(text, { ...CURRENT_OPTIONS, ...options, onDone: () => { isSpeaking = false; } });
   },
 
   stop() {
@@ -99,6 +95,21 @@ export const voiceEngine = {
       "Turn on or turn off: living room light, bedroom light, kitchen light, fan. Lock or unlock main door. " +
       "Say: Go back, to return. Say: Repeat, to hear the last message. Say: Stop, to cancel."
     );
+  },
+
+  setLanguage(langCode) {
+    CURRENT_OPTIONS = { ...CURRENT_OPTIONS, language: langCode };
+    this.speak(`Language set.`);
+  },
+
+  setRate(rate) {
+    const r = Math.max(0.6, Math.min(rate, 1.2));
+    CURRENT_OPTIONS = { ...CURRENT_OPTIONS, rate: r };
+    this.speak(`Speech speed updated.`);
+  },
+
+  getLanguage() {
+    return CURRENT_OPTIONS.language;
   },
 };
 

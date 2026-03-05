@@ -10,7 +10,7 @@ import {
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { voiceEngine } from "../services/voiceEngine";
-import { voiceListener } from "../services/voiceListener";
+import voiceListener from "../services/voiceListener";
 import VoiceInputModal from "../components/VoiceInputModal";
 
 // Speech recognition is loaded only when available (dev build). Expo Go has no native module.
@@ -19,9 +19,7 @@ function getSpeechRecognition() {
     return require("expo-speech-recognition");
   } catch {
     return null;
-  }
-}
-
+  }a
 // Advanced high-contrast theme
 const BG = "#050508";
 const PRIMARY = "#22d3ee";

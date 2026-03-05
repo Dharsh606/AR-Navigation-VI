@@ -7,6 +7,7 @@ import HomeScreen from "./src/screens/HomeScreen";
 import ARScreen from "./src/screens/ARScreen";
 import CameraScreen from "./src/screens/CameraScreen";
 import DashboardScreen from "./src/screens/DashboardScreen";
+import AnalyticsScreen from "./src/screens/AnalyticsScreen";
 import { initAudioForSpeech } from "./src/services/voiceEngine";
 import { speechRecognitionService } from "./src/services/speechRecognitionService";
 import { voiceListener } from "./src/services/voiceListener";
@@ -55,6 +56,11 @@ export default function App() {
           name="Dashboard"
           component={DashboardScreen}
           options={{ title: "Bluetooth Dashboard" }}
+        />
+        <Stack.Screen
+          name="Analytics"
+          component={AnalyticsScreen}
+          options={{ title: "Analytics" }}
         />
       </Stack.Navigator>
     </NavigationContainer>

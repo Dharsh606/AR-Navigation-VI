@@ -4,14 +4,16 @@ import { voiceEngine } from "../services/voiceEngine";
 import { navigationEngine } from "../services/navigationEngine";
 import { detectionAdapter } from "../services/detectionAdapter";
 import { obstacleVibration } from "../services/hapticAlerts";
+import { settingsService } from "../services/settingsService";
 
-const NAV_DIRECTION_INTERVAL_MS = 12000;
-const OBSTACLE_CHECK_INTERVAL_MS = 6000;
+const NAV_DIRECTION_INTERVAL_MS = settingsService.navDirectionIntervalMs();
+const OBSTACLE_CHECK_INTERVAL_MS = settingsService.obstacleCheckIntervalMs();
 
 export default function ARScreen({ navigation }) {
   const [lastObstacle, setLastObstacle] = useState(null);
   const directionInterval = useRef(null);
   const obstacleInterval = useRef(null);
+  const crosswalkAnnouncedRef = useRef(false);
 
   const speakDirection = useCallback(() => {
     const directions = [
@@ -26,6 +28,15 @@ export default function ARScreen({ navigation }) {
 
   const checkObstacles = useCallback(async () => {
     const detections = await detectionAdapter.detectObjects(null);
+    if (detectionAdapter.hasCrosswalk(detections)) {
+      if (!crosswalkAnnouncedRef.current) {
+        crosswalkAnnouncedRef.current = true;
+        voiceEngine.speak("Crosswalk detected ahead. Be careful.");
+        obstacleVibration("center", "medium");
+      }
+    } else {
+      crosswalkAnnouncedRef.current = false;
+    }
     const analyzed = detectionAdapter.analyzeDetections(detections);
     if (analyzed && (analyzed.level === "high" || analyzed.level === "medium")) {
       setLastObstacle(analyzed);
@@ -159,10 +170,6 @@ const styles = StyleSheet.create({
     color: "#e2e8f0",
     fontSize: 14,
     lineHeight: 20,
-  },
-  alertHigh: {
-    backgroundColor: "rgba(30, 15, 15, 0.95)",
-    borderColor: "rgba(248, 113, 113, 0.8)",
   },
   alertLabelHigh: {
     color: "#f87171",

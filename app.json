@@ -1,5 +1,11 @@
 {
   "plugins": [
     "expo-speech-recognition"
-  ]
+  ],
+  "android": {
+    "permissions": [
+      "android.permission.RECORD_AUDIO"
+    ],
+    "package": "com.anonymous.arnavvi"
+  }
 }

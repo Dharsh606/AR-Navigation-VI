@@ -67,3 +67,49 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Build APK locally (Windows)
+
+1. Install prerequisites
+   - Android Studio with SDK and Platform Tools
+   - Java 17 (set JAVA_HOME to JDK 17)
+   - Node 18+
+
+2. Prepare project
+   ```bash
+   npm install
+   npx expo prebuild
+   ```
+
+3. Optional: run a dev build
+   ```bash
+   npx expo run:android
+   ```
+
+4. Build release APK
+   ```powershell
+   cd android
+   .\gradlew assembleRelease
+   ```
+
+5. Locate APK
+   - android\app\build\outputs\apk\release\app-release.apk
+
+6. Copy APK into releases folder
+   ```powershell
+   mkdir releases
+   copy android\app\build\outputs\apk\release\app-release.apk releases\ar-nav-vi-preview.apk
+   ```
+
+7. One-shot script (PowerShell)
+   ```powershell
+   pwsh scripts\build-apk.ps1
+   ```
+
+8. Share APK or commit with Git LFS
+   ```bash
+   git lfs install
+   git add .gitattributes releases\ar-nav-vi-preview.apk
+   git commit -m "Add preview APK with native voice listening"
+   git push
+   ```
