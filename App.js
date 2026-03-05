@@ -15,14 +15,20 @@ const Stack = createNativeStackNavigator();
 
 export default function App() {
   const navRef = useRef(null);
+  
   useEffect(() => {
-    initAudioForSpeech();
-    speechRecognitionService.startRecognition((t) => {
-      voiceListener.handleTranscript(t, navRef.current);
-    });
-    return () => {
-      speechRecognitionService.stopRecognition();
+    // Initialize services safely with error handling
+    const initializeServices = async () => {
+      try {
+        // Initialize voice engine
+        const { initAudioForSpeech } = await import("./src/services/voiceEngine");
+        await initAudioForSpeech();
+      } catch (error) {
+        console.log("Voice engine initialization failed:", error);
+      }
     };
+
+    initializeServices();
   }, []);
 
   return (

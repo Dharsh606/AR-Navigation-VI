@@ -5,166 +5,92 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { voiceEngine } from "../services/voiceEngine";
-import voiceListener from "../services/voiceListener";
-import VoiceInputModal from "../components/VoiceInputModal";
 
-// Speech recognition is loaded only when available (dev build). Expo Go has no native module.
-function getSpeechRecognition() {
-  try {
-    return require("expo-speech-recognition");
-  } catch {
-    return null;
-  }
-}
-
-// Advanced high-contrast theme
 const BG = "#050508";
 const PRIMARY = "#22d3ee";
 const ON_BG = "#0c1222";
 const TEXT = "#e2e8f0";
-const BORDER = "#1e293b";
 
 export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
-  const [showVoiceModal, setShowVoiceModal] = useState(false);
-  const navigationRef = useRef(navigation);
-
-  navigationRef.current = navigation;
 
   const requestPermissions = useCallback(async () => {
-    const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
-    if (locStatus !== "granted") {
-      voiceEngine.speak("Location permission denied.");
-    } else {
-      await Location.getCurrentPositionAsync({});
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log("Location permission:", status);
+    } catch (error) {
+      console.log("Permission error:", error);
     }
     setLoading(false);
   }, []);
 
   useEffect(() => {
     requestPermissions();
-    voiceEngine.welcome();
-    return () => {
-      voiceEngine.stop();
-    };
   }, [requestPermissions]);
 
   const onPress = (action) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    switch (action) {
-      case "navigation":
-        voiceEngine.confirmAction("Starting navigation.");
-        navigation.navigate("AR");
-        break;
-      case "scan":
-        voiceEngine.confirmAction("Opening scan mode.");
-        navigation.navigate("Camera");
-        break;
-      case "emergency":
-        voiceEngine.confirmEmergency();
-        require("../services/emergencyModule").triggerEmergency();
-        break;
-      case "dashboard":
-        voiceEngine.confirmAction("Opening Bluetooth dashboard.");
-        navigation.navigate("Dashboard");
-        break;
-      default:
-        break;
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      
+      switch (action) {
+        case "navigation":
+          navigation.navigate("AR");
+          break;
+        case "scan":
+          navigation.navigate("Camera");
+          break;
+        case "dashboard":
+          navigation.navigate("Dashboard");
+          break;
+        case "emergency":
+          console.log("Emergency pressed");
+          break;
+      }
+    } catch (error) {
+      console.log("Button error:", error);
     }
   };
 
-  const openVoiceFallback = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    voiceEngine.speak("Opening voice fallback. Listening.");
-    setShowVoiceModal(true);
-  };
-
-  const handleVoiceResult = (transcript) => {
-    voiceListener.handleTranscript(transcript, navigationRef.current);
-  };
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={styles.loadingText}>Initializing...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <VoiceInputModal
-        visible={showVoiceModal}
-        onClose={() => setShowVoiceModal(false)}
-        onResult={handleVoiceResult}
-      />
-      <View style={styles.headerStrip} />
-      <Text style={styles.title} accessibilityRole="header">
-        AR-NAV-VI
-      </Text>
-      <Text style={styles.subtitle}>
-        Voice-first navigation for the visually impaired
-      </Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>AR-NAV-VI</Text>
+        <Text style={styles.subtitle}>Voice-First Navigation</Text>
+      </View>
 
-      {loading && (
-        <ActivityIndicator size="large" color={PRIMARY} style={styles.loader} />
-      )}
-
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonNav]}
-          onPress={() => onPress("navigation")}
-          accessibilityLabel="Start navigation"
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>Navigation</Text>
-          <Text style={styles.buttonHint}>Start navigation</Text>
+      <View style={styles.buttonGrid}>
+        <TouchableOpacity style={styles.button} onPress={() => onPress("navigation")}>
+          <Text style={styles.buttonText}>🧭 Navigation</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.buttonScan]}
-          onPress={() => onPress("scan")}
-          accessibilityLabel="Scan surroundings"
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>AR Scan</Text>
-          <Text style={styles.buttonHint}>Scan surroundings</Text>
+        <TouchableOpacity style={styles.button} onPress={() => onPress("scan")}>
+          <Text style={styles.buttonText}>📷 Scan</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.buttonEmergency]}
-          onPress={() => onPress("emergency")}
-          accessibilityLabel="Emergency help"
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>Emergency</Text>
-          <Text style={styles.buttonHint}>Emergency help</Text>
+        <TouchableOpacity style={styles.button} onPress={() => onPress("dashboard")}>
+          <Text style={styles.buttonText}>🏠 Smart Home</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.button, styles.buttonDashboard]}
-          onPress={() => onPress("dashboard")}
-          accessibilityLabel="Bluetooth dashboard, devices"
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>Devices</Text>
-          <Text style={styles.buttonHint}>Bluetooth dashboard</Text>
+        <TouchableOpacity style={[styles.button, styles.emergencyButton]} onPress={() => onPress("emergency")}>
+          <Text style={[styles.buttonText, styles.emergencyText]}>🚨 Emergency</Text>
         </TouchableOpacity>
       </View>
 
-      {voiceListener.isListening() ? (
-        <Text style={styles.voiceStatus}>Voice listening</Text>
-      ) : (
-        <>
-          <TouchableOpacity
-            style={[styles.button, styles.fallbackButton]}
-            onPress={openVoiceFallback}
-            accessibilityLabel="Open fallback voice input"
-            accessibilityRole="button"
-          >
-            <Text style={styles.buttonText}>Fallback voice</Text>
-            <Text style={styles.buttonHint}>Open voice input</Text>
-          </TouchableOpacity>
-          <Text style={styles.voiceStatusHint}>Voice listening unavailable. Use fallback voice or the buttons.</Text>
-        </>
-      )}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Tap buttons or use voice</Text>
+      </View>
     </View>
   );
 }
@@ -173,110 +99,60 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG,
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === "ios" ? 48 : 24,
+    padding: 20,
+    justifyContent: "center",
   },
-  headerStrip: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: PRIMARY,
-    opacity: 0.6,
+  header: {
+    alignItems: "center",
+    marginBottom: 40,
   },
   title: {
-    color: PRIMARY,
-    fontSize: 30,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 6,
-    letterSpacing: 2,
+    fontSize: 32,
+    fontWeight: "bold",
+    color: TEXT,
+    marginBottom: 8,
   },
   subtitle: {
-    color: TEXT,
-    fontSize: 15,
+    fontSize: 16,
+    color: PRIMARY,
     textAlign: "center",
-    marginBottom: 28,
-    opacity: 0.85,
   },
-  loader: {
-    marginVertical: 16,
-  },
-  buttons: {
-    gap: 14,
+  buttonGrid: {
+    gap: 16,
   },
   button: {
     backgroundColor: ON_BG,
     borderWidth: 2,
-    borderColor: BORDER,
-    borderRadius: 18,
-    paddingVertical: 22,
-    paddingHorizontal: 22,
-    minHeight: 84,
-    justifyContent: "center",
-    ...Platform.select({
-      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 6 },
-      android: { elevation: 4 },
-    }),
-  },
-  buttonNav: {
     borderColor: PRIMARY,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: "center",
   },
-  buttonScan: {
-    borderColor: "#a78bfa",
-  },
-  buttonEmergency: {
-    borderColor: "#f87171",
-  },
-  buttonDashboard: {
-    borderColor: "#34d399",
-  },
-  fallbackButton: {
-    borderColor: PRIMARY,
-    marginTop: 16,
+  emergencyButton: {
+    backgroundColor: "#8B0000",
+    borderColor: "#FF0000",
   },
   buttonText: {
-    color: TEXT,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "bold",
+    color: TEXT,
   },
-  buttonHint: {
+  emergencyText: {
+    color: "#FFFFFF",
+  },
+  loadingText: {
+    color: TEXT,
+    marginTop: 16,
+    fontSize: 16,
+    textAlign: "center",
+  },
+  footer: {
+    marginTop: 40,
+    alignItems: "center",
+  },
+  footerText: {
     color: TEXT,
     fontSize: 14,
-    opacity: 0.8,
-    marginTop: 4,
-  },
-  voiceStatus: {
-    position: "absolute",
-    bottom: 28,
-    alignSelf: "center",
-    color: PRIMARY,
-    fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 1,
-    opacity: 0.9,
-  },
-  voiceStatusHint: {
-    position: "absolute",
-    bottom: 28,
-    alignSelf: "center",
-    color: PRIMARY,
-    fontSize: 11,
-    textAlign: "center",
-    paddingHorizontal: 12,
-    opacity: 0.9,
-  },
-  tapToSpeakArea: {
-    paddingVertical: 20,
-    paddingHorizontal: 8,
-    marginBottom: 8,
-  },
-  tapHint: {
-    color: PRIMARY,
-    fontSize: 13,
-    marginTop: 12,
-    textAlign: "center",
-    opacity: 0.9,
+    opacity: 0.7,
   },
 });
